@@ -1,0 +1,59 @@
+{
+   "medications": [
+        {
+            "name": "Amoxicillin",
+            "category": "Antibiotic",
+            "dosage_form": "Capsule",
+            "brand_name": "Amoxil",
+            "concentration": "500 mg",
+            "price": 12.99,
+            "refill_requests": 2,
+            "refills_issued": 1,
+            "image_url":"https://img.freepik.com/premium-photo/pills-with-medicines-white-background_196038-28609.jpg?w=1380"
+        },
+        {
+            "name": "Ibuprofen",
+            "category": "Pain reliever",
+            "dosage_form": "Tablet",
+            "brand_name": "Advil",
+            "concentration": "200 mg",
+            "price": 8.49,
+            "refill_requests": 3,
+            "refills_issued": 1,
+            "image_url":"https://img.freepik.com/premium-photo/pills-with-medicines-white-background_196038-28609.jpg?w=1380"
+        },
+        {
+            "name": "Lisinopril",
+            "category": "Antihypertensive",
+            "dosage_form": "Tablet",
+            "brand_name": "Prinivil",
+            "concentration": "10 mg",
+            "price": 5.99,
+            "refill_requests": 1,
+            "refills_issued": 2,
+            "image_url":"https://img.freepik.com/premium-photo/pills-with-medicines-white-background_196038-28609.jpg?w=1380"
+        },
+        {
+            "name": "Sertraline",
+            "category": "Antidepressant",
+            "dosage_form": "Tablet",
+            "brand_name": "Zoloft",
+            "concentration": "50 mg",
+            "price": 22.99,
+            "refill_requests": 1,
+            "refills_issued": 3,
+            "image_url":"https://img.freepik.com/premium-photo/pills-with-medicines-white-background_196038-28609.jpg?w=1380"
+        },
+        {
+            "name": "Simvastatin",
+            "category": "Statin",
+            "dosage_form": "Tablet",
+            "brand_name": "Zocor",
+            "concentration": "20 mg",
+            "price": 15.99,
+            "refill_requests": 1,
+            "refills_issued": 2,
+            "image_url":"https://img.freepik.com/premium-photo/pills-with-medicines-white-background_196038-28609.jpg?w=1380"
+        }
+    ]   
+}
