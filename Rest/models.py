@@ -19,7 +19,7 @@ class Refill_orders(models.Model):
     date = models.DateField(auto_now=True)
     orderlist = models.JSONField()
     TotalPrice= models.DecimalField(max_digits=10, decimal_places=2)
-
+    
     def __str__(self):
         return self.username
 class Admins(models.Model):

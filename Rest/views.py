@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.db import transaction
+from django.db.models import Sum,Count
 from .models import Medications,Refill_orders
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.hashers import  check_password
@@ -11,7 +12,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
-
+from Rest.helpscript import dates
 import json
 import os
 project_root = os.path.dirname(os.path.abspath(__file__))
@@ -39,14 +40,17 @@ class RegisterView(APIView):
             user = serializer.save()
             return Response({'status': 'success', 'user_id': user.id, 'message': 'Registration successful'}, status=status.HTTP_201_CREATED)
 
-        return Response({'status': 'failure', 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'status': 'failure', 'errors': {'username': 'username already in use'},'message': 'username already in use'}, status=status.HTTP_400_BAD_REQUEST)
 class LoginView(APIView):
     permission_classes = [AllowAny]  # Allow non-authenticated users to log in
 
     def post(self, request):
         username = request.data.get('username')
         password = request.data.get('password')
-
+        user = User.objects.filter(username=username).first()
+        if not user:
+            return Response({ 'status': 'failure','message': 'wrong username','errors': {'username': 'Invalid username'} }, status=status.HTTP_400_BAD_REQUEST)
+        
         user = authenticate(username=username, password=password)
 
         if user:
@@ -116,7 +120,7 @@ class LoadMedicationsView(APIView):
 
 class IssueOrderView(APIView):
     permission_classes = [IsAuthenticated]
-  
+    @transaction.atomic
     def post(self,request):
         try:
             orderlist = request.data.get('orderlist')
@@ -137,6 +141,28 @@ class IssueOrderView(APIView):
             return Response({'status': 'success', 'message': 'Order and medications updated successfully'}, status=201)
         except Exception as e:
             return Response({'error':str(e),'status':'failure','message':'insertion failed'})
+
+
+class GetAnaltiycs(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self,request):
+        try:
+            medications = Medications.objects.all()
+            medication_list = list(medications.values('name','refill_requests'))
+            total_refill_requests = Medications.objects.aggregate(total=Sum('refill_requests'))['total']
+            user_order_count = Refill_orders.objects.values('user_id__username').annotate(order_count=Count('id'))
+            calender=dates()
+            orders_this_year_count = Refill_orders.objects.filter(date__gte=calender['start_of_year']).count()
+            orders_this_month_count = Refill_orders.objects.filter(date__gte=calender['start_of_month']).count()
+            orders_this_week_count = Refill_orders.objects.filter(date__gte=calender['start_of_week']).count()
+            orders_today_count = Refill_orders.objects.filter(date__gte=calender['start_of_day']).count()
+            economic_calender={'year':orders_this_year_count,'month':orders_this_month_count,'week':orders_this_week_count,'day':orders_today_count}
+            data={'medicines':medication_list,'total_request':total_refill_requests,'users':user_order_count,'economic_calender':economic_calender}
+            return Response({'status':'success','message':'retreived data successfully','data':data},status=200)
+        except Exception as e:
+            return Response({'error':str(e),'status':'failure','message':'insertion failed'})
+
 
 @csrf_exempt
 def populate(request):
