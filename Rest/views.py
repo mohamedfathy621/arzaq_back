@@ -1,86 +1,142 @@
 from django.shortcuts import render
-from rest_framework.permissions import IsAuthenticated
 from django.http import JsonResponse
-from .models import User, Medications
+from django.db import transaction
+from .models import Medications,Refill_orders
 from django.views.decorators.csrf import csrf_exempt
-from rest_framework.decorators import api_view, permission_classes
 from django.contrib.auth.hashers import  check_password
+from rest_framework.permissions import AllowAny,IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework import status, serializers
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.contrib.auth.models import User
+from django.contrib.auth import authenticate
+
 import json
 import os
 project_root = os.path.dirname(os.path.abspath(__file__))
 file_path = os.path.join(project_root, 'dummy_list.json')
-@csrf_exempt
-def register(request):
-    if request.method =='POST':
-        try:
-            data = json.loads(request.body)
-            username = data.get('username')
-            email = data.get('email')
-            password = data.get('password')
-            if User.objects.filter(username=username).exists():
-                return JsonResponse({'status': 'faliure', 'message': 'Username already exists','errors':{'username':'Username already exists'}}, status=400)
 
-            if User.objects.filter(email=email).exists():
-                return JsonResponse({'status': 'faliure', 'message': 'Email already exists','errors':{'email':'Email already exists'}}, status=400)
-            
-            user = User(username=username, email=email)
-            user.set_password(password)  
-            user.save()  
-            return JsonResponse({'status': 'success', 'user_id': user.id,'message':'Registeration successful'}, status=201)
-        except json.JSONDecodeError:
-             return JsonResponse({'error': 'Invalid JSON'}, status=400)
-    return JsonResponse({'error': 'Invalid method'}, status=405)
-@csrf_exempt
-def login(request):
-    if request.method == 'GET':
-        return JsonResponse({'message': 'This is the login endpoint'})
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            username = data.get('username')
-            password = data.get('password')  
-            if User.objects.filter(username=username).exists():
-                 user = User.objects.get(username=username)
-                 is_correct = check_password(password, user.password)
-                 if is_correct:
-                    refresh = RefreshToken.for_user(user)
-                    access_token = str(refresh.access_token)
-                    refresh_token = str(refresh)
+class UserSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
 
-                    return JsonResponse({'status':'success',"message": "Authentication successful",'access_token': access_token,'refresh_token': refresh_token}, status=200)
-                 else:
-                    return JsonResponse({'status': 'faliure',"message": "wrong password",'errors':{'password':'wrong password'}}, status=400)
-            else:
-                return JsonResponse({'status': 'faliure',"message": "Invalid username or password",'errors':{'username':'wrong username','password':'wrong password'}}, status=400)
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
-@csrf_exempt
-def refresh_access_token(request):
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        refresh_token = data.get('refresh',None)
-    
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'password']
+
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        user = User.objects.create(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user
+class RegisterView(APIView):
+    permission_classes = [AllowAny]
+    def post(self, request):
+        serializer = UserSerializer(data=request.data)
+
+        if serializer.is_valid():
+            user = serializer.save()
+            return Response({'status': 'success', 'user_id': user.id, 'message': 'Registration successful'}, status=status.HTTP_201_CREATED)
+
+        return Response({'status': 'failure', 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+class LoginView(APIView):
+    permission_classes = [AllowAny]  # Allow non-authenticated users to log in
+
+    def post(self, request):
+        username = request.data.get('username')
+        password = request.data.get('password')
+
+        user = authenticate(username=username, password=password)
+
+        if user:
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+            refresh_token = str(refresh)
+
+            return Response({
+                'status': 'success',
+                'message': 'Authentication successful',
+                'access_token': access_token,
+                'refresh_token': refresh_token
+            }, status=status.HTTP_200_OK)
+
+        return Response({
+            'status': 'failure',
+            'message': 'Invalid username or password',
+            'errors': {'username': 'Invalid username', 'password': 'Invalid password'}
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+class RefreshAccessTokenView(APIView):
+    permission_classes = [AllowAny]  # Allow any user to access this view
+
+    def post(self, request):
+        # Get refresh token from request data
+        data = request.data
+        refresh_token = data.get('refresh', None)
+
         if not refresh_token:
-            return JsonResponse({'status': 'faliure',"message": "session has expired"}, status=400)
+            return Response(
+                {'status': 'failure', 'message': 'Session has expired'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         try:
-        # Decode and verify the refresh token using simplejwt
+            # Decode and verify the refresh token using simplejwt
             refresh = RefreshToken(refresh_token)
             access_token = str(refresh.access_token)
-            return JsonResponse({'status':'success',"message": "welcome back",'access_token': access_token,'refresh_token': refresh_token}, status=200)
+
+            return Response(
+                {
+                    'status': 'success',
+                    'message': 'Welcome back',
+                    'access_token': access_token,
+                    'refresh_token': refresh_token
+                },
+                status=status.HTTP_200_OK
+            )
         except Exception as e:
-            return JsonResponse({"error": str(e),'status': 'faliure',"message": "session has expired",'token':refresh_token}, status=500)
+            return Response(
+                {'error': str(e), 'status': 'failure', 'message': 'Session has expired', 'token': refresh_token},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
+class LoadMedicationsView(APIView):
+    permission_classes = [IsAuthenticated]  # Ensure that only authenticated users can access this view
 
-@permission_classes([IsAuthenticated])
-def load_medications(request):
-    if request.method == 'GET':
+    def get(self, request):
         try:
+            # Retrieve all medications from the database
             medications = Medications.objects.all()
             medication_list = list(medications.values())  # Converts to list of dictionaries
-            return JsonResponse({"status": "success", "medications": medication_list}, status=200)
+
+            return Response({"status": "success", "medications": medication_list}, status=status.HTTP_200_OK)
         except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)      
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class IssueOrderView(APIView):
+    permission_classes = [IsAuthenticated]
+  
+    def post(self,request):
+        try:
+            orderlist = request.data.get('orderlist')
+            totalprice = request.data.get('totalprice')
+            username= request.data.get('username')
+            user = User.objects.filter(username=username).first()
+            if not user:
+                return Response({'status': 'failure', 'message': 'User not found','user':username}, status=404)
+            order=Refill_orders(user_id=user,orderlist=orderlist,TotalPrice=totalprice)
+            order.save()
+            for medicine_name, details in orderlist.items():
+                quantity = details.get('quantaity')
+                medicine=Medications.objects.filter(name=medicine_name).first()
+                if not medicine:
+                    return Response({'status': 'failure', 'message': 'medicine not found'}, status=404)
+                medicine.refill_requests += quantity
+                medicine.save()
+            return Response({'status': 'success', 'message': 'Order and medications updated successfully'}, status=201)
+        except Exception as e:
+            return Response({'error':str(e),'status':'failure','message':'insertion failed'})
 
 @csrf_exempt
 def populate(request):

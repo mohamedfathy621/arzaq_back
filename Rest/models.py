@@ -1,21 +1,6 @@
 from django.db import models
-from django.contrib.auth.hashers import make_password, check_password
+from django.contrib.auth.models import User
 # Create your models here.
-class User(models.Model):
-    username = models.CharField(max_length=100)
-    email = models.EmailField()
-    password = models.CharField(max_length=255)  # Ideally hashed in production
-
-    def __str__(self):
-        return self.username
-    
-    def set_password(self, raw_password):
-        self.password = make_password(raw_password)
-        self.save()
-
-    def check_password(self, raw_password):
-        return check_password(raw_password, self.password)
-    
 class Medications(models.Model):
     name = models.CharField(max_length=100)
     category = models.CharField(max_length=100)
