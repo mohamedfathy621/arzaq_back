@@ -3,12 +3,16 @@ name: Docker Build and Push
 on:
   push:
     branches:
-        - '*'  # Trigger the workflow on pushes to the main branch
+      - '*'  # Trigger the workflow on pushes to the main branch
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]  # Add Windows to the matrix
+
     steps:
     # Checkout the code from the repository
     - name: Checkout repository
@@ -33,4 +37,3 @@ jobs:
         file: ./Dockerfile  # Specify the path to your Dockerfile
         push: true
         tags: mohamedfathyzaky621/test  # Replace with your Docker Hub username and repository name
-        
