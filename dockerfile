@@ -1,27 +1,25 @@
-# Step 1: Use the official Python image as a base image
 FROM python:3.9-slim
 
-# Step 2: Set environment variables to prevent Python from writing .pyc files and buffering output
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
-
-# Step 3: Set the working directory inside the container
+# Set working directory
 WORKDIR /app
 
-# Step 4: Copy the requirements.txt file into the container
-COPY requirements.txt /app/
+# Install system dependencies if necessary (e.g., for psycopg2, etc.)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Step 5: Install dependencies
+# Copy requirements.txt
+COPY requirements.txt .
+
+# Upgrade pip and install dependencies
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Step 6: Copy the entire project to the container (including frontend/dist for static files)
-COPY . /app/
+# Copy the rest of the app files
+COPY . .
 
-# Step 7: Expose port 8000 for the Django app
+# Expose the port your Django app will run on
 EXPOSE 8000
 
-# Step 8: Collect static files (this includes your React `frontend/dist`)
-RUN python manage.py collectstatic --noinput
-
-# Step 9: Run the Django app (in development mode for local usage)
+# Command to run Django app
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
