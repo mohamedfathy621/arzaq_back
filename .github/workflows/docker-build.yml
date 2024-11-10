@@ -18,9 +18,10 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    # Set up Docker Buildx
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+    # Set DOCKER_BUILDKIT=0 for Windows runners to disable BuildKit
+    - name: Set BuildKit to 0 for Windows
+      if: runner.os == 'Windows'
+      run: echo "DOCKER_BUILDKIT=0" >> $GITHUB_ENV
 
     # Log in to Docker Hub
     - name: Log in to Docker Hub
