@@ -109,3 +109,4 @@ Each view in the application is detailed in the `views.py` file, providing a cle
    ```bash
    python populate.py
    ```
+   to use the app go to the base url http://127.0.0.1:8000/ as front end is served staticly 
