@@ -18,19 +18,25 @@ import os
 project_root = os.path.dirname(os.path.abspath(__file__))
 file_path = os.path.join(project_root, 'dummy_list.json')
 
+# this is a serializer used to handle valdiation and insertion for registartion#
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
         fields = ['username', 'email', 'password']
-
+    #the password is not saved in the database for security reasons 
     def create(self, validated_data):
         password = validated_data.pop('password')
         user = User.objects.create(**validated_data)
         user.set_password(password)
         user.save()
         return user
+
+#this view works on a post method
+#first it checks the data using the serializer
+#on validation it inserts the data and repsonds with status 201 and a message to notify the user
+#on faliure it responds with status 400 and a message to notify the user
 class RegisterView(APIView):
     permission_classes = [AllowAny]
     def post(self, request):
@@ -41,6 +47,13 @@ class RegisterView(APIView):
             return Response({'status': 'success', 'user_id': user.id, 'message': 'Registration successful'}, status=status.HTTP_201_CREATED)
 
         return Response({'status': 'failure', 'errors': {'username': 'username already in use'},'message': 'username already in use'}, status=status.HTTP_400_BAD_REQUEST)
+
+#this is the login view
+##first it checks if the user is in the database
+##if faliure it responds with status 400 and a message to notify the user about the wrong username
+## on sucess it uses django middle ware for authenticaon o
+## if sucess the user is sent a status 200 , a token and a message to notify the user 
+## on faliure it responds with status 400 and a messsage to notify the user
 class LoginView(APIView):
     permission_classes = [AllowAny]  # Allow non-authenticated users to log in
 
@@ -71,6 +84,10 @@ class LoginView(APIView):
             'errors': {'username': 'Invalid username', 'password': 'Invalid password'}
         }, status=status.HTTP_400_BAD_REQUEST)
 
+##this is the refresh token view
+##this functions uses django middle ware to checks for the validty of the session
+## on sucess it responds with a valid access token
+## on faliure it notifies the user the session has ended and an error status
 class RefreshAccessTokenView(APIView):
     permission_classes = [AllowAny]  # Allow any user to access this view
 
@@ -105,6 +122,10 @@ class RefreshAccessTokenView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+##this is the medication view
+## it requires JWT authentication 
+## if the token is valid the user is sent a list of medicaitons in the database
+## on faliure an error is sent instead
 class LoadMedicationsView(APIView):
     permission_classes = [IsAuthenticated]  # Ensure that only authenticated users can access this view
 
@@ -118,6 +139,13 @@ class LoadMedicationsView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+##THIS is the issue refill request view 
+##it requires authentcation 
+##if the token is valid the view checks to see if the user still exists in the database to avoid errors
+##if so the orderlist is divided into seprate medications
+##first the order is saved in the database
+##then each medicine has it's refill requests coloumn incremnted with the respective quanataity
+## a transaction atomic decorator is used to ensure if an error occurs in any of the operations the operations as a whole is not commited 
 class IssueOrderView(APIView):
     permission_classes = [IsAuthenticated]
     @transaction.atomic
@@ -143,6 +171,12 @@ class IssueOrderView(APIView):
             return Response({'error':str(e),'status':'failure','message':'insertion failed'})
 
 
+##this is the view to get chart data
+##first each medication is fetched from the database with only the name and the amount of refill requests
+##the total amount of refill requests is fetched from the sum of refill requests database
+##users and thier respective order count is fetched from the database
+##then orders are fetched from the database and summed occurding to thier time category (yearly,monthly,weekly,daily)
+##this data is then put into a json response and sent to the user
 class GetAnaltiycs(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -164,6 +198,7 @@ class GetAnaltiycs(APIView):
             return Response({'error':str(e),'status':'failure','message':'insertion failed'})
 
 
+##this is a dummy view to populate the data base
 @csrf_exempt
 def populate(request):
      if request.method == 'POST':
@@ -184,3 +219,4 @@ def populate(request):
             return JsonResponse({'status':'faliure',"message": "wrong credintals"}, status=400)
          except Exception as e:
             return JsonResponse({"error": str(e),'data':medic_list}, status=500)
+
