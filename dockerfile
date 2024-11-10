@@ -1,21 +1,23 @@
+# Use a Python base image
 FROM python:3.9-slim
 
-# Set working directory
+# Set the working directory in the container
 WORKDIR /app
 
-# Install system dependencies if necessary (e.g., for psycopg2, etc.)
+# Install system dependencies (including git)
 RUN apt-get update && apt-get install -y \
     build-essential \
     libpq-dev \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements.txt
+# Copy the requirements.txt file
 COPY requirements.txt .
 
 # Upgrade pip and install dependencies
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Copy the rest of the app files
+# Copy the rest of the application files
 COPY . .
 
 # Expose the port your Django app will run on
