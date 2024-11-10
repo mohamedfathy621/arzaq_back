@@ -105,4 +105,7 @@ Each view in the application is detailed in the `views.py` file, providing a cle
    ```bash
    python manage.py runserver
    ```
-
+   to populate database with dummy data
+   ```bash
+   python populate.py
+   ```

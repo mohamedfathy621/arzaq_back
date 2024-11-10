@@ -197,26 +197,16 @@ class GetAnaltiycs(APIView):
         except Exception as e:
             return Response({'error':str(e),'status':'failure','message':'insertion failed'})
 
-
-##this is a dummy view to populate the data base
 @csrf_exempt
 def populate(request):
      if request.method == 'POST':
-         data = json.loads(request.body)
-         username = data.get('username')
-         password = data.get('password')
          try:
-            if User.objects.filter(username=username).exists():
-                user = User.objects.get(username=username)
-                is_correct = check_password(password, user.password)
-                if is_correct:
-                    with open(file_path, 'r') as file:
-                        medic_list = json.load(file)['medications']
-                    for item in medic_list:
-                        medication=Medications(name=item['name'], category=item['category'],dosage_form=item['dosage_form'],brand_name=item['brand_name'],concentration=item['concentration'],price=item['price'],refill_requests=0,refills_issued=0,image_url=item['image_url'])
-                        medication.save()
+                with open(file_path, 'r') as file:
+                    medic_list = json.load(file)['medications']
+                for item in medic_list:
+                    medication=Medications(name=item['name'], category=item['category'],dosage_form=item['dosage_form'],brand_name=item['brand_name'],concentration=item['concentration'],price=item['price'],refill_requests=0,refills_issued=0,image_url=item['image_url'])
+                    medication.save()
                 return JsonResponse({'status':'success',"message": "data inserted"}, status=200)
-            return JsonResponse({'status':'faliure',"message": "wrong credintals"}, status=400)
          except Exception as e:
             return JsonResponse({"error": str(e),'data':medic_list}, status=500)
 
