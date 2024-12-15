@@ -1,3 +1,7 @@
+import base64
+import requests
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.db import transaction
@@ -39,16 +43,19 @@ class UserSerializer(serializers.ModelSerializer):
 #on faliure it responds with status 400 and a message to notify the user
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+    @transaction.atomic
     def post(self, request):
         
         serializer = UserSerializer(data=request.data)
         try:
             data=request.data
             profile = Profile.objects.create(
-                name=data.get('username'),
+                username=data.get('username'),
+                name=data.get('firstname')+" "+data.get('lastname'),
                 type=data.get('type'),
                 titles='nothing at the moment',
                 description='add your description here',
+                Phone_number=data.get('phonenumber'),
                 email=data.get('email'),
                 image_url=''
             )
@@ -78,16 +85,17 @@ class LoginView(APIView):
             return Response({ 'status': 'failure','message': 'wrong username','errors': {'username': 'Invalid username'} }, status=status.HTTP_400_BAD_REQUEST)
         
         user = authenticate(username=username, password=password)
-        profile = Profile.objects.get(name=request.data.get('username'))
-        profile_data = {
+        if user:
+            profile = Profile.objects.get(username=request.data.get('username'))
+            profile_data = {
             'profile_name': profile.name,
             'profile_type': profile.type,
+            'profile_number': profile.Phone_number,
             'profile_titles': profile.titles,
             'profile_description': profile.description,
             'profile_email': profile.email,
             'profile_image_url': profile.image_url,
-        }
-        if user:
+            }
             refresh = RefreshToken.for_user(user)
             access_token = str(refresh.access_token)
             refresh_token = str(refresh)
@@ -105,7 +113,36 @@ class LoginView(APIView):
             'message': 'Invalid username or password',
             'errors': {'username': 'Invalid username', 'password': 'Invalid password'}
         }, status=status.HTTP_400_BAD_REQUEST)
-
+class EditView(APIView):
+    permission_classes = [IsAuthenticated]  # Allow non-authenticated users to log in
+    def post(self, request):
+        profile = Profile.objects.get(username=request.data.get('username'))
+        if profile:
+            data=request.data
+            profile.name=data.get('firstname')+" "+data.get('lastname')
+            profile.email=data.get('email')
+            profile.description=data.get('description')
+            profile.titles=data.get('titles')
+            profile.Phone_number=data.get('phonenumber')
+            profile.save()
+            profile_data = {
+            'profile_name': data.get('firstname')+" "+data.get('lastname'),
+            'profile_type': profile.type,
+            'profile_number': data.get('phonenumber'),
+            'profile_titles': data.get('titles'),
+            'profile_description': data.get('description'),
+            'profile_email':data.get('email'),
+            'profile_image_url': profile.image_url,
+            }
+            return Response({
+                'status': 'edited',
+                'message': 'data saved',
+                'profile': profile_data
+            }, status=status.HTTP_200_OK)
+        return Response({
+            'status': 'failure',
+            'message': 'error saving data',
+        }, status=status.HTTP_400_BAD_REQUEST)
 ##this is the refresh token view
 ##this functions uses django middle ware to checks for the validty of the session
 ## on sucess it responds with a valid access token
@@ -143,3 +180,44 @@ class RefreshAccessTokenView(APIView):
                 {'error': str(e), 'status': 'failure', 'message': 'Session has expired', 'token': refresh_token},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+@csrf_exempt
+@require_POST
+def check_url(request):
+    api_key = '00eacfa24518aadd93bac2c4fe38456dc1cf70c3ecf0f35849294f5ff526e209'  # Replace with your VirusTotal API key
+    
+    try:
+        # Parse the incoming JSON request
+        data = json.loads(request.body)
+        url = 'http://audacity.de/'
+        
+        if not url:
+            return JsonResponse({'error': 'No URL provided'}, status=400)
+
+        # URL-safe Base64 encode the URL
+        base64_url = base64.urlsafe_b64encode(url.encode()).decode().strip("=")
+        # Debug: Print the Base64 encoded URL to verify it's correct
+        print(f" URL: {url}")
+        print(f"Encoded URL: {base64_url}")
+        
+        # Construct the VirusTotal API endpoint
+        vt_url = f'https://www.virustotal.com/api/v3/urls/{base64_url}'
+
+        # Make the request to VirusTotal
+        headers = {
+            'x-apikey': api_key
+        }
+
+        response = requests.get(vt_url, headers=headers)
+
+        if response.status_code == 200:
+            return JsonResponse(response.json())  # Forward the response from VirusTotal
+        
+        # If not successful, return the error message from VirusTotal
+        error_data = response.json()  # Parse the error response from VirusTotal
+        print(f"VirusTotal Error Response: {error_data}")  # Debug the error message
+        return JsonResponse({'error': error_data}, status=response.status_code)
+    
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON in request body'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
